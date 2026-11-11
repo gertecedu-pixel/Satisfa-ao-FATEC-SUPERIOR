@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Painel CPA 2026 | Administração</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.adm{max-width:1120px;margin:20px auto 40px;padding:0 16px}
+.bar-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button,.chip{border:1.5px solid var(--border);background:#fff;border-radius:999px;padding:8px 16px;cursor:pointer;font-weight:600;font-family:inherit;color:var(--text)}
+.tabs button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px}
+.kpi b{display:block;font-size:1.8rem;line-height:1.1}
+.kpi span{color:var(--muted);font-size:.85rem}
+.sec{margin-bottom:18px}
+.sec h2{margin:0 0 12px;font-size:1.1rem}
+.row{display:grid;grid-template-columns:minmax(120px,1.4fr) 3fr 90px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #eef2f8;font-size:.9rem}
+.row:first-child{border-top:0}
+.track{height:12px;background:#e9eff8;border-radius:99px;overflow:hidden;display:flex}
+.track i{display:block;height:100%}
+.nm{font-weight:600}.mut{color:var(--muted);font-size:.82rem}
+.q-item{padding:14px 0;border-top:1px solid var(--border)}
+.q-item:first-of-type{border-top:0}
+.q-item p{margin:0 0 8px;font-weight:600}
+.dist{display:flex;gap:3px;height:26px;margin:6px 0}
+.dist div{flex:1;background:#e9eff8;border-radius:5px;position:relative;display:flex;align-items:flex-end;overflow:hidden}
+.dist div i{display:block;width:100%;background:var(--blue)}
+.dist-l{display:flex;gap:3px;font-size:.7rem;color:var(--muted)}.dist-l span{flex:1;text-align:center}
+.tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.tools .input{width:auto;flex:1 1 180px;padding:9px 12px}
+.tw{overflow:auto;max-height:480px;border:1px solid var(--border);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{padding:8px 10px;border-bottom:1px solid #eef2f8;text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#f4f7fb;z-index:1}
+.ok{color:var(--ok);font-weight:700}.pend{color:#b45309;font-weight:700}
+.cm{padding:10px 12px;background:#f7f9fc;border-radius:10px;margin-bottom:8px;font-size:.9rem}
+.note{background:#eaf1fb;color:var(--blue);border-radius:10px;padding:10px 14px;font-size:.85rem;margin-bottom:16px}
+.login-box{max-width:420px;margin:60px auto}
+@media(max-width:700px){.row{grid-template-columns:1fr 2fr 70px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-inner">
+  <img class="brand-logo" src="logo-senai-fiems.png" alt="SENAI FIEMS">
+  <span class="badge">Painel CPA · Administração</span>
+</div></header>
+
+<!-- LOGIN -->
+<main id="telaLogin" class="wrap login-box">
+  <div class="card">
+    <h2>Acesso administrativo</h2>
+    <p class="sub">Restrito à CPA e coordenação.</p>
+    <form id="f" novalidate>
+      <div class="field"><label class="lbl" for="usr">Usuário</label><input class="input" id="usr" autocomplete="username" required></div>
+      <div class="field"><label class="lbl" for="pw">Senha</label><input class="input" id="pw" type="password" autocomplete="current-password" required></div>
+      <button class="btn" id="entrar" type="submit">Entrar</button>
+      <div class="msg" id="msgL" role="alert"></div>
+    </form>
+  </div>
+</main>
+
+<!-- PAINEL -->
+<main id="telaPainel" class="adm" style="display:none">
+  <div class="bar-top">
+    <div class="tabs" id="tabs"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="mut" id="atualizado"></span>
+      <button class="chip" id="btnAtualizar">↻ Atualizar</button>
+      <button class="chip" id="btnSair">Sair</button>
+    </div>
+  </div>
+  <div class="note">🔒 Os resultados são <b>agregados</b>: as respostas não são ligadas a pessoas. Resultados por curso só aparecem com pelo menos <span id="minG">5</span> respostas.</div>
+  <div id="conteudo"><div class="card">Carregando…</div></div>
+</main>
+
+<script src="config.js"></script>
+<script src="mock-api.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const NOMES = { discente: 'Discentes', docente: 'Docentes', colaborador: 'Colaboradores' };
+  let token = null, perfil = 'discente', dados = null, filtroCurso = '';
+
+  try { token = sessionStorage.getItem('cpa_admin'); } catch (e) {}
+  if (token) mostrarPainel();
+
+  $('f').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const m = $('msgL'); m.className = 'msg';
+    const b = $('entrar'); b.disabled = true; b.textContent = 'Verificando...';
+    const r = await api('adminLogin', { usuario: $('usr').value, senha: $('pw').value });
+    b.disabled = false; b.textContent = 'Entrar';
+    if (!r.ok) { m.className = 'msg err'; m.textContent = r.erro || 'Falha no login.'; $('pw').value = ''; return; }
+    token = r.token;
+    try { sessionStorage.setItem('cpa_admin', token); } catch (e2) {}
+    mostrarPainel();
+  });
+
+  $('btnSair').addEventListener('click', sair);
+  $('btnAtualizar').addEventListener('click', carregar);
+
+  function sair() {
+    token = null;
+    try { sessionStorage.removeItem('cpa_admin'); } catch (e) {}
+    $('telaPainel').style.display = 'none'; $('telaLogin').style.display = '';
+    $('pw').value = '';
+  }
+
+  function mostrarPainel() {
+    $('telaLogin').style.display = 'none'; $('telaPainel').style.display = '';
+    $('tabs').innerHTML = Object.keys(NOMES).map(function (p) {
+      return '<button data-p="' + p + '" class="' + (p === perfil ? 'on' : '') + '">' + NOMES[p] + '</button>';
+    }).join('');
+    $('tabs').querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () { perfil = b.dataset.p; filtroCurso = ''; mostrarPainel(); });
+    });
+    carregar();
+  }
+
+  async function carregar() {
+    $('conteudo').innerHTML = '<div class="card">Carregando…</div>';
+    const r = await api('adminDados', { token: token, perfil: perfil });
+    if (r.expirou) { sair(); const m = $('msgL'); m.className = 'msg err'; m.textContent = r.erro; return; }
+    if (!r.ok) { $('conteudo').innerHTML = '<div class="card"><div class="msg err" style="display:block">' + esc(r.erro || 'Erro ao carregar.') + '</div></div>'; return; }
+    dados = r;
+    $('atualizado').textContent = 'Atualizado em ' + r.atualizadoEm;
+    $('minG').textContent = r.minGrupo;
+    render();
+  }
+
+  const pct = function (x) { return (x * 100).toFixed(1).replace('.', ',') + '%'; };
+
+  function render() {
+    const d = dados, p = d.participacao, res = d.resultados;
+    const taxa = p.total ? p.respondeu / p.total : 0;
+    let h = '<div class="kpis">' +
+      kpi(p.total, 'Total de respondentes') + kpi(p.respondeu, 'Responderam') + kpi(p.total - p.respondeu, 'Pendentes') + kpi(pct(taxa), '% de participação') + '</div>';
+
+    // participação por curso
+    h += '<section class="card sec"><h2>Participação por curso/setor</h2>' + p.porCurso.map(function (c) {
+      const t = c.total ? c.respondeu / c.total : 0;
+      return '<div class="row"><div class="nm">' + esc(c.curso) + '</div><div class="track"><i style="width:' + (t * 100) + '%;background:var(--orange)"></i></div><div>' + c.respondeu + '/' + c.total + ' · ' + pct(t) + '</div></div>';
+    }).join('') + '</section>';
+
+    // resultados
+    const cursos = p.porCurso.map(function (c) { return c.curso; });
+    h += '<section class="card sec"><h2>Resultados (' + res.totalRespostas + ' respostas)</h2>' +
+      '<div class="tools"><select class="input" id="fCurso"><option value="">Todos os cursos/setores</option>' +
+      cursos.map(function (c) { return '<option' + (c === filtroCurso ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
+      '</select></div>';
+    if (!res.totalRespostas) h += '<p class="mut">Ainda não há respostas.</p>';
+    let secAtual = '';
+    res.perguntas.forEach(function (q) {
+      if (q.secao !== secAtual) { secAtual = q.secao; h += '<h3 style="margin:18px 0 4px;color:var(--blue)">' + esc(secAtual) + '</h3>'; }
+      h += blocoPergunta(q);
+    });
+    h += '</section>';
+
+    // comentários
+    res.comentarios.forEach(function (c) {
+      h += '<section class="card sec"><h2>' + esc(c.texto) + '</h2>' +
+        (c.itens.length ? c.itens.map(function (t) { return '<div class="cm">' + esc(t) + '</div>'; }).join('') : '<p class="mut">Sem comentários.</p>') + '</section>';
+    });
+
+    // lista
+    h += '<section class="card sec"><h2>Lista de respondentes <span class="mut">(quem respondeu — sem o conteúdo das respostas)</span></h2>' +
+      '<div class="tools"><input class="input" id="busca" placeholder="Buscar nome ou RA/matrícula">' +
+      '<select class="input" id="fSit"><option value="">Todas as situações</option><option>Respondeu</option><option>Pendente</option></select>' +
+      '<select class="input" id="fCursoL"><option value="">Todos os cursos/setores</option>' + cursos.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select>' +
+      '<button class="chip" id="csv">⬇ Exportar CSV</button></div>' +
+      '<div class="tw"><table><thead><tr><th>Unidade</th><th>Curso/Setor</th><th>Turma</th><th>Login</th><th>Nome</th><th>Situação</th><th>Data</th></tr></thead><tbody id="tb"></tbody></table></div>' +
+      '<p class="mut" id="cont"></p></section>';
+
+    $('conteudo').innerHTML = h;
+    $('fCurso').addEventListener('change', function () { filtroCurso = this.value; render(); });
+    ['busca', 'fSit', 'fCursoL'].forEach(function (id) { $(id).addEventListener('input', tabela); });
+    $('csv').addEventListener('click', csv);
+    tabela();
+  }
+
+  function kpi(v, l) { return '<div class="kpi"><b>' + v + '</b><span>' + l + '</span></div>'; }
+
+  function blocoPergunta(q) {
+    let s = q.geral, dist = q.dist, aviso = '';
+    if (filtroCurso) {
+      s = q.porCurso[filtroCurso];
+      dist = null;
+      if (!s) aviso = '<span class="mut">Suprimido: menos de ' + dados.minGrupo + ' respostas neste grupo (sigilo).</span>';
+    }
+    let corpo = aviso;
+    if (s && s.n) {
+      corpo = '<div class="mut">n = ' + s.n + ' · média ' + String(s.media).replace('.', ',') + ' · favorável ' + pct(s.fav) + (s.nps !== undefined ? ' · NPS ' + s.nps : '') + '</div>';
+      if (dist) {
+        const mx = Math.max.apply(null, dist.concat([1]));
+        corpo += '<div class="dist">' + dist.map(function (v) { return '<div title="' + v + '"><i style="height:' + (v / mx * 100) + '%"></i></div>'; }).join('') + '</div>' +
+          '<div class="dist-l">' + dist.map(function (_, i) { return '<span>' + (i + q.distIni) + '</span>'; }).join('') + '</div>';
+      }
+    } else if (!aviso) corpo = '<span class="mut">Sem respostas.</span>';
+    return '<div class="q-item"><p>' + esc(q.texto) + '</p>' + corpo + '</div>';
+  }
+
+  function filtradas() {
+    const b = $('busca').value.trim().toLowerCase(), sit = $('fSit').value, cu = $('fCursoL').value;
+    return dados.lista.filter(function (l) {
+      return (!sit || l[5] === sit) && (!cu || l[1] === cu) &&
+        (!b || String(l[4]).toLowerCase().indexOf(b) >= 0 || String(l[3]).indexOf(b) >= 0);
+    });
+  }
+
+  function tabela() {
+    const f = filtradas();
+    $('tb').innerHTML = f.slice(0, 500).map(function (l) {
+      return '<tr>' + l.map(function (c, i) {
+        return '<td' + (i === 5 ? ' class="' + (c === 'Respondeu' ? 'ok' : 'pend') + '"' : '') + '>' + esc(c) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    $('cont').textContent = f.length + ' registro(s)' + (f.length > 500 ? ' (mostrando 500; o CSV traz todos)' : '');
+  }
+
+  function csv() {
+    const cab = ['Unidade', 'Curso/Setor', 'Turma', 'Login', 'Nome', 'Situação', 'Data'];
+    const lin = [cab].concat(filtradas()).map(function (r) {
+      return r.map(function (c) {
+        let v = String(c).replace(/"/g, '""');
+        if (/^[=+\-@]/.test(v)) v = "'" + v;
+        return '"' + v + '"';
+      }).join(';');
+    });
+    const blob = new Blob(['﻿' + lin.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'respondentes_' + perfil + '.csv'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+})();
+</script>
+</body>
+</html>

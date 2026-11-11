@@ -7,6 +7,7 @@ Landing + login + questionário, com sigilo das respostas. Mesma arquitetura do 
 - `pesquisa.html` – termo LGPD + questionário em etapas
 - `config.js` – URL do Apps Script (vazia = modo demonstração)
 - `apps-script/Code.gs` – backend, **questionários** e relatórios
+- `admin.html` – painel administrativo (login próprio; participação, lista de respondentes, resultados agregados)
 - `mock-api.js` – simulação para testes (login `100001` / senha `12345678909`)
 
 ## Como funciona o acesso
@@ -35,3 +36,9 @@ A planilha de resultados tem duas abas independentes por perfil:
 - **Listas de docentes e colaboradores:** criar abas `Docentes` e `Colaboradores` (colunas em `CFG.PERFIS`).
 - **LGPD:** a planilha de alunos contém CPF, nome e nascimento. Restrinja o acesso, e avalie com o DPO/jurídico o Apps Script como operador (Google) e o texto do termo.
 - **Segurança:** o Apps Script é adequado para o piloto; para a Visita MEC/INEP considere backend institucional (SSO do portal, auditoria).
+
+## Painel administrativo (`admin.html`)
+1. No Apps Script: Configurações do projeto → Propriedades do script → adicione `ADMIN_USUARIO` e `ADMIN_SENHA`.
+2. Publique **nova versão** da implantação.
+3. Acesse `.../admin.html` (não há link público para ele).
+Mostra, ao vivo: participação por curso, lista Respondeu/Pendente (com filtro e CSV), resultados agregados e comentários anônimos. Nunca mostra resposta por pessoa; resultados por curso só com 5+ respostas.
