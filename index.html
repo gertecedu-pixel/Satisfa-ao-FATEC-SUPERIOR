@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>PAI 2026 – Pesquisa CPA | FATEC e FACON</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top"><div class="top-inner">
+  <img class="brand-logo" src="logo-senai-fiems.png" alt="SENAI FIEMS">
+  <span class="badge">PAI · Programa de Avaliação Institucional</span>
+</div></header>
+
+<section class="hero"><div class="hero-inner">
+  <span class="eyebrow">Comissão Própria de Avaliação · 2026</span>
+  <h1>Sua opinião constrói a nossa instituição</h1>
+  <p>Participe da autoavaliação institucional da FATEC e da FACON. Leva cerca de 10 minutos e suas respostas são <strong>sigilosas</strong>.</p>
+</div></section>
+
+<main class="grid">
+  <section class="card">
+    <h2>Acesse a pesquisa</h2>
+    <p class="sub" id="perfilTxt"></p>
+    <form id="f" novalidate>
+      <div class="field">
+        <label class="lbl" for="login"><span id="loginLbl">RA</span> <span class="hint" id="loginHint"></span></label>
+        <input class="input" id="login" inputmode="numeric" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label class="lbl" for="senha">Senha <span class="hint">(CPF, somente números)</span></label>
+        <div class="pw">
+          <input class="input" id="senha" type="password" inputmode="numeric" autocomplete="current-password" maxlength="14" required>
+          <button type="button" id="ver" aria-label="Mostrar senha">Mostrar</button>
+        </div>
+      </div>
+      <button class="btn" id="entrar" type="submit">Entrar</button>
+      <div class="msg" id="msg" role="alert"></div>
+    </form>
+  </section>
+
+  <aside class="card">
+    <h2>Como funciona</h2>
+    <p class="sub">Transparência sobre o uso dos seus dados.</p>
+    <ul class="info-list">
+      <li><div class="ico">🔒</div><div><strong>Resposta sigilosa</strong><span>Seu login serve apenas para confirmar o vínculo e evitar respostas duplicadas. As respostas são gravadas sem nome, RA ou CPF.</span></div></li>
+      <li><div class="ico">✅</div><div><strong>Acesso controlado</strong><span>Somente alunos, docentes e colaboradores regularmente vinculados participam, uma única vez.</span></div></li>
+      <li><div class="ico">📊</div><div><strong>Resultados agregados</strong><span>Os relatórios mostram apenas totais por curso/setor; grupos muito pequenos não são exibidos.</span></div></li>
+      <li><div class="ico">⚖️</div><div><strong>LGPD</strong><span>Tratamento conforme a Lei nº 13.709/2018 e o Código de Conduta Institucional, para fins de avaliação institucional (SINAES/MEC/INEP).</span></div></li>
+    </ul>
+  </aside>
+</main>
+
+<div class="footer">SENAI FIEMS · FATEC e FACON · Comissão Própria de Avaliação (CPA)</div>
+
+<script src="config.js"></script>
+<script src="mock-api.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  const perfil = perfilDaUrl();
+  const p = CPA_CONFIG.PERFIS[perfil];
+  document.getElementById('perfilTxt').textContent = 'Área do ' + p.rotulo.toLowerCase().replace('corpo ', 'corpo ') + '. Use seu login e senha.';
+  document.getElementById('loginLbl').textContent = p.login;
+  document.getElementById('loginHint').textContent = '(' + p.loginHint.toLowerCase() + ')';
+
+  const login = document.getElementById('login'), senha = document.getElementById('senha');
+  const msg = document.getElementById('msg'), btn = document.getElementById('entrar');
+  [login, senha].forEach(function (el) { el.addEventListener('input', function () { el.value = el.value.replace(/\D/g, ''); }); });
+  document.getElementById('ver').addEventListener('click', function () {
+    const mostrar = senha.type === 'password';
+    senha.type = mostrar ? 'text' : 'password';
+    this.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+  });
+
+  if (sessao.ler()) sessao.limpar();
+
+  document.getElementById('f').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    msg.className = 'msg';
+    if (!login.value || senha.value.length < 8) {
+      msg.className = 'msg err'; msg.textContent = 'Informe seu login e a senha (CPF).'; return;
+    }
+    btn.disabled = true; btn.textContent = 'Verificando...';
+    const r = await api('login', { perfil: perfil, login: login.value, senha: senha.value });
+    if (r.ok) {
+      sessao.salvar({ perfil: perfil, token: r.token, nome: r.nome, curso: r.curso, questionario: r.questionario });
+      location.href = 'pesquisa.html';
+      return;
+    }
+    msg.className = 'msg ' + (r.jaRespondeu ? 'info' : 'err');
+    msg.textContent = r.erro || 'Não foi possível entrar.';
+    senha.value = '';
+    btn.disabled = false; btn.textContent = 'Entrar';
+  });
+})();
+</script>
+</body>
+</html>
