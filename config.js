@@ -5,7 +5,7 @@ window.CPA_CONFIG = {
   ANO: 2026,
   PERFIS: {
     discente:    { rotulo: 'Corpo Discente',               login: 'RA (Registro Acadêmico)', loginHint: 'Somente números' },
-    docente:     { rotulo: 'Corpo Docente',                login: 'Matrícula',               loginHint: 'Somente números' },
-    colaborador: { rotulo: 'Corpo Técnico-Administrativo', login: 'Matrícula',               loginHint: 'Somente números' }
+    docente:     { rotulo: 'Corpo Docente',                login: 'Matrícula',               loginHint: 'Ex.: 2994', permiteBarra: true },
+    colaborador: { rotulo: 'Corpo Técnico-Administrativo', login: 'Matrícula',               loginHint: 'Ex.: 1/4815 ou 4815', permiteBarra: true }
   }
 };

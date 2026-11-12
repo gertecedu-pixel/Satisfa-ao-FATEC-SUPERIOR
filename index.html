@@ -67,7 +67,10 @@
 
   const login = document.getElementById('login'), senha = document.getElementById('senha');
   const msg = document.getElementById('msg'), btn = document.getElementById('entrar');
-  [login, senha].forEach(function (el) { el.addEventListener('input', function () { el.value = el.value.replace(/\D/g, ''); }); });
+  const reLogin = p.permiteBarra ? /[^\d\/]/g : /\D/g;   // matrículas de funcionários têm "/" (ex.: 1/4815)
+  login.addEventListener('input', function () { login.value = login.value.replace(reLogin, ''); });
+  senha.addEventListener('input', function () { senha.value = senha.value.replace(/\D/g, ''); });
+  if (p.permiteBarra) login.removeAttribute('inputmode');
   document.getElementById('ver').addEventListener('click', function () {
     const mostrar = senha.type === 'password';
     senha.type = mostrar ? 'text' : 'password';
