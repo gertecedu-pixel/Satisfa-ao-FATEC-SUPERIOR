@@ -3,14 +3,23 @@
 (function () {
   const Q = {
     titulo: 'Autoavaliação Institucional – Corpo Discente (DEMO)',
+    abertura: ['PAI – Programa de Autoavaliação Institucional 2026 (modo demonstração).'],
+    escala: ['Não sei responder', 'Insuficiente', 'Suficiente', 'Muito boa', 'Excelente'],
     secoes: [
-      { titulo: 'Seu curso', perguntas: [
-        { id: 'd01', tipo: 'likert', texto: 'O projeto pedagógico do curso é coerente com a proposta apresentada na matrícula.' },
-        { id: 'd02', tipo: 'likert', texto: 'Os docentes demonstram domínio dos conteúdos.' }
+      { titulo: 'Instituição', perguntas: [
+        { id: 'd_nps_ies', tipo: 'nps', texto: 'De 0 a 10, qual a probabilidade de você recomendar a Faculdade SENAI?' },
+        { id: 'd_motivos', tipo: 'multipla', max: 2, texto: 'Principais motivos da nota?', ajuda: 'Você pode assinalar até duas opções.',
+          opcoes: [{ v: 'Infraestrutura', t: 'Infraestrutura' }, { v: 'Acadêmico', t: 'Acadêmico' }, { v: 'Atendimento', t: 'Atendimento' }] }
       ]},
-      { titulo: 'Visão geral', perguntas: [
-        { id: 'd03', tipo: 'nps', texto: 'De 0 a 10, qual a chance de você recomendar a instituição?' },
-        { id: 'd04', tipo: 'texto', obrigatoria: false, texto: 'Sugestões (opcional – não se identifique).' }
+      { titulo: 'Seu curso', intro: 'Considere a escala: (1) não sei responder · (2) insuficiente · (3) suficiente · (4) muito boa · (5) excelente', perguntas: [
+        { id: 'd01', tipo: 'escala', texto: 'Os conteúdos apresentados contribuem para os estudos.' }
+      ]},
+      { titulo: 'Atuação dos professores', professores: true, lista: ['Professor(a) A', 'Professor(a) B'], perguntas: [
+        { id: 'dp34', tipo: 'escala', texto: 'O(a) professor(a) demonstra domínio dos conteúdos.' }
+      ]},
+      { titulo: 'Perfil', perguntas: [
+        { id: 'd_pf_genero', tipo: 'unica', perfil: true, texto: 'Gênero', opcoes: ['Feminino', 'Masculino', 'Outro', 'Prefiro não informar'] },
+        { id: 'd_melhoria', tipo: 'texto', maxlen: 150, obrigatoria: false, texto: 'O que poderia melhorar? (opcional)' }
       ]}
     ]
   };
@@ -46,10 +55,21 @@
       return { ok: true, perfil: p.perfil, atualizadoEm: '11/11/2026 15:40', minGrupo: 5,
         participacao: { total: 7, respondeu: 5, porCurso: [{ curso: 'Design de Interiores', total: 5, respondeu: 3 }, { curso: 'Engenharia Civil', total: 2, respondeu: 2 }] },
         lista: lista,
-        resultados: { totalRespostas: 21, perguntas: [
-          { id: 'd01', texto: 'O projeto pedagógico é coerente.', tipo: 'likert', secao: 'Seu curso', geral: { n: 21, media: 3.9, fav: 0.67 }, dist: dist, distIni: 1, porCurso: { 'Design de Interiores': { n: 8, media: 4.1, fav: 0.75 } } },
-          { id: 'd11', texto: 'Recomendaria a instituição?', tipo: 'nps', secao: 'Visão geral', geral: { n: 21, media: 8.1, fav: 0.6, nps: 38 }, dist: [0, 0, 0, 1, 1, 1, 1, 2, 4, 5, 6], distIni: 0, porCurso: {} }
-        ], comentarios: [{ id: 'd12', texto: 'Sugestões', itens: ['Mais tomadas na sala 3.'] }] } };
+        resultados: { totalRespostas: 21, escala: ['Não sei responder', 'Insuficiente', 'Suficiente', 'Muito boa', 'Excelente'], secoes: [
+          { titulo: 'Instituição', perguntas: [
+            { id: 'd_nps_ies', texto: 'Recomendaria a instituição? (0–10)', tipo: 'nps', geral: { n: 21, media: 8.1, fav: 0.6, nps: 38 }, dist: [0, 0, 0, 1, 1, 1, 1, 2, 4, 5, 6], distIni: 0, porCurso: {} },
+            { id: 'd_motivos', texto: 'Principais motivos da nota', tipo: 'multipla', n: 21, suprimido: false, opcoes: [{ v: 'Infraestrutura', n: 9 }, { v: 'Acadêmico', n: 14 }, { v: 'Atendimento', n: null }] }
+          ]},
+          { titulo: 'Seu curso', perguntas: [
+            { id: 'd01', texto: 'O projeto pedagógico é coerente.', tipo: 'escala', geral: { n: 19, media: 3.9, fav: 0.67 }, dist: dist, distIni: 1, porCurso: { 'Design de Interiores': { n: 8, media: 4.1, fav: 0.75 } } }
+          ]},
+          { titulo: 'Perfil', perguntas: [
+            { id: 'd_pf_genero', texto: 'Gênero', tipo: 'unica', perfil: true, n: 21, suprimido: false, opcoes: [{ v: 'Feminino', n: 12 }, { v: 'Masculino', n: 7 }, { v: 'Outro', n: null }] }
+          ]}
+        ], professores: [
+          { professor: 'Professor(a) A', avaliacoes: 12, suprimido: false, mediaGeral: 4.2, perguntas: [{ id: 'dp34', texto: 'Domínio dos conteúdos', n: 12, media: 4.4 }] },
+          { professor: 'Professor(a) B', avaliacoes: 3, suprimido: true, mediaGeral: null, perguntas: [] }
+        ], comentarios: [{ id: 'd_melhoria', texto: 'Sugestões', itens: ['Mais tomadas na sala 3.'] }] } };
     }
     return { ok: false, erro: 'Ação inválida.' };
   };

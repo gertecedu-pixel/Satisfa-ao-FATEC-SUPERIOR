@@ -154,12 +154,23 @@ th{position:sticky;top:0;background:#f4f7fb;z-index:1}
       cursos.map(function (c) { return '<option' + (c === filtroCurso ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
       '</select></div>';
     if (!res.totalRespostas) h += '<p class="mut">Ainda não há respostas.</p>';
-    let secAtual = '';
-    res.perguntas.forEach(function (q) {
-      if (q.secao !== secAtual) { secAtual = q.secao; h += '<h3 style="margin:18px 0 4px;color:var(--blue)">' + esc(secAtual) + '</h3>'; }
-      h += blocoPergunta(q);
+    res.secoes.forEach(function (sc) {
+      h += '<h3 style="margin:18px 0 4px;color:var(--blue)">' + esc(sc.titulo) + '</h3>';
+      sc.perguntas.forEach(function (q) { h += blocoPergunta(q, res.escala); });
     });
     h += '</section>';
+
+    // professores (discentes)
+    if (res.professores && res.professores.length) {
+      h += '<section class="card sec"><h2>Avaliação dos professores <span class="mut">(média 2–5; "não sei responder" não entra)</span></h2>' +
+        '<div class="tw"><table><thead><tr><th>Professor(a)</th><th>Avaliações</th><th>Média geral</th>' +
+        res.professores[0].perguntas.concat([]).map(function (_, i) { return '<th>Q' + (i + 1) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        res.professores.map(function (pr) {
+          if (pr.suprimido) return '<tr><td>' + esc(pr.professor) + '</td><td>' + pr.avaliacoes + '</td><td colspan="9" class="mut">Suprimido: menos de ' + dados.minGrupo + ' avaliações (sigilo)</td></tr>';
+          return '<tr><td>' + esc(pr.professor) + '</td><td>' + pr.avaliacoes + '</td><td><b>' + (pr.mediaGeral === null ? '–' : String(pr.mediaGeral).replace('.', ',')) + '</b></td>' +
+            pr.perguntas.map(function (q) { return '<td title="' + esc(q.texto) + '">' + (q.media === null ? '–' : String(q.media).replace('.', ',')) + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div></section>';
+    }
 
     // comentários
     res.comentarios.forEach(function (c) {
@@ -185,7 +196,20 @@ th{position:sticky;top:0;background:#f4f7fb;z-index:1}
 
   function kpi(v, l) { return '<div class="kpi"><b>' + v + '</b><span>' + l + '</span></div>'; }
 
-  function blocoPergunta(q) {
+  function blocoPergunta(q, escala) {
+    if (q.tipo === 'unica' || q.tipo === 'multipla') {
+      let corpo;
+      if (q.suprimido) {
+        corpo = '<span class="mut">Suprimido: menos de ' + dados.minGrupo + ' respostas (sigilo).</span>';
+      } else {
+        const mx = Math.max.apply(null, q.opcoes.map(function (o) { return o.n || 0; }).concat([1]));
+        corpo = '<div class="mut">n = ' + q.n + (q.tipo === 'multipla' ? ' (cada pessoa podia marcar mais de uma)' : '') + '</div>' + q.opcoes.map(function (o) {
+          return '<div class="row"><div>' + esc(o.v) + '</div><div class="track"><i style="width:' + ((o.n || 0) / mx * 100) + '%;background:var(--blue)"></i></div><div>' +
+            (o.n === null ? '&lt;' + dados.minGrupo : o.n) + '</div></div>';
+        }).join('');
+      }
+      return '<div class="q-item"><p>' + esc(q.texto) + '</p>' + corpo + '</div>';
+    }
     let s = q.geral, dist = q.dist, aviso = '';
     if (filtroCurso) {
       s = q.porCurso[filtroCurso];
@@ -194,7 +218,7 @@ th{position:sticky;top:0;background:#f4f7fb;z-index:1}
     }
     let corpo = aviso;
     if (s && s.n) {
-      corpo = '<div class="mut">n = ' + s.n + ' · média ' + String(s.media).replace('.', ',') + ' · favorável ' + pct(s.fav) + (s.nps !== undefined ? ' · NPS ' + s.nps : '') + '</div>';
+      corpo = '<div class="mut">n = ' + s.n + (q.tipo === 'escala' ? ' (sem "não sei responder")' : '') + ' · média ' + String(s.media).replace('.', ',') + ' · favorável ' + pct(s.fav) + (s.nps !== undefined ? ' · NPS ' + s.nps : '') + '</div>';
       if (dist) {
         const mx = Math.max.apply(null, dist.concat([1]));
         corpo += '<div class="dist">' + dist.map(function (v) { return '<div title="' + v + '"><i style="height:' + (v / mx * 100) + '%"></i></div>'; }).join('') + '</div>' +

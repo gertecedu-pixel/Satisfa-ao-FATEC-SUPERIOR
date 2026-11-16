@@ -27,71 +27,125 @@
   const s = sessao.ler();
   if (!s || !s.token) { location.replace('index.html'); return; }
   const Q = s.questionario;
+  const ESC = Q.escala || ['Não sei responder', 'Insuficiente', 'Suficiente', 'Muito boa', 'Excelente'];
   const card = document.getElementById('card');
   document.getElementById('quem').textContent = 'Olá, ' + s.nome + (s.curso ? ' · ' + s.curso : '');
   document.getElementById('sair').addEventListener('click', function () { sessao.limpar(); location.href = 'index.html?perfil=' + s.perfil; });
 
-  const LIKERT = [[1, 'Discordo totalmente'], [2, 'Discordo'], [3, 'Neutro'], [4, 'Concordo'], [5, 'Concordo totalmente']];
   let rasc = {};
   try { rasc = JSON.parse(sessionStorage.getItem('cpa_rascunho')) || {}; } catch (e) {}
+  rasc.professores = rasc.professores || {};
   const total = Q.secoes.length;
-  let passo = rasc._passo || 0;   // 0 = termo; 1..total = seções
+  let passo = rasc._passo || 0;          // 0 = abertura/termo; 1..total = seções
   let aceitou = !!rasc._aceitou;
-
-  function salvar() { try { sessionStorage.setItem('cpa_rascunho', JSON.stringify(Object.assign({}, rasc, { _passo: passo, _aceitou: aceitou }))); } catch (e) {} }
+  const salvar = function () { rasc._passo = passo; rasc._aceitou = aceitou; try { sessionStorage.setItem('cpa_rascunho', JSON.stringify(rasc)); } catch (e) {} };
 
   function progresso() {
-    return '<div class="step-info"><span>' + (passo === 0 ? 'Termo de ciência' : 'Etapa ' + passo + ' de ' + total) + '</span><span>' +
-      Math.round((passo / (total + 0)) * 100) + '%</span></div><div class="progress"><div style="width:' + Math.round(passo / total * 100) + '%"></div></div>';
+    const pct = Math.round(passo / total * 100);
+    return '<div class="step-info"><span>' + (passo === 0 ? 'Início' : 'Etapa ' + passo + ' de ' + total) + '</span><span>' + pct + '%</span></div>' +
+      '<div class="progress"><div style="width:' + pct + '%"></div></div>';
   }
 
+  // ---------- renderização ----------
   function render() {
     window.scrollTo({ top: 0 });
-    if (passo === 0) return renderTermo();
+    if (passo === 0) return renderInicio();
     const sec = Q.secoes[passo - 1];
-    card.innerHTML = progresso() + '<h2>' + esc(sec.titulo) + '</h2>' + sec.perguntas.map(pergunta).join('') +
-      '<div class="msg" id="msg" role="alert"></div>' +
+    let h = progresso() + '<h2>' + esc(sec.titulo) + '</h2>' + (sec.intro ? '<div class="note">' + esc(sec.intro) + '</div>' : '');
+    if (sec.professores) {
+      h += sec.lista.map(function (nome, i) {
+        return '<div class="prof"><h3>' + esc(nome) + '</h3>' + sec.perguntas.map(function (p) { return pergunta(p, { prof: nome, idx: i }); }).join('') + '</div>';
+      }).join('');
+    } else {
+      h += sec.perguntas.map(function (p) { return pergunta(p); }).join('');
+    }
+    h += '<div class="msg" id="msg" role="alert"></div>' +
       '<div class="nav"><button class="btn ghost" id="voltar" type="button">Voltar</button>' +
       '<button class="btn" id="prox" type="button">' + (passo === total ? 'Enviar respostas' : 'Continuar') + '</button></div>';
-
-    card.querySelectorAll('input[type=radio]').forEach(function (i) {
-      i.addEventListener('change', function () { rasc[i.name] = i.value; i.closest('.q').classList.remove('invalid'); salvar(); });
-    });
-    card.querySelectorAll('textarea').forEach(function (t) {
-      t.addEventListener('input', function () { rasc[t.name] = t.value; salvar(); });
-    });
+    card.innerHTML = h;
     document.getElementById('voltar').addEventListener('click', function () { passo--; salvar(); render(); });
     document.getElementById('prox').addEventListener('click', proximo);
   }
 
-  function pergunta(q) {
-    const v = rasc[q.id];
-    let corpo = '';
-    if (q.tipo === 'likert') {
-      corpo = '<div class="opts">' + LIKERT.map(function (o) { return radio(q.id, o[0], o[1], v); }).join('') +
-        '<label class="na">' + radioInner(q.id, 'NA', 'Não sei / não se aplica', v) + '</label></div>';
-    } else if (q.tipo === 'nps') {
-      let n = ''; for (let i = 0; i <= 10; i++) n += radio(q.id, i, i, v);
-      corpo = '<div class="opts nps">' + n + '</div><div class="scale-notes"><span>Nada provável</span><span>Muito provável</span></div>';
-    } else {
-      corpo = '<textarea class="input" name="' + q.id + '" maxlength="2000">' + esc(v || '') + '</textarea>';
-    }
-    return '<div class="q" data-id="' + q.id + '" data-req="' + (q.obrigatoria !== false) + '"><p>' + esc(q.texto) +
-      (q.obrigatoria !== false ? ' <span style="color:#c62828">*</span>' : '') + '</p>' + corpo + '</div>';
-  }
-  function radio(id, val, rot, atual) { return '<label>' + radioInner(id, val, rot, atual) + '</label>'; }
-  function radioInner(id, val, rot, atual) {
-    return '<input type="radio" name="' + id + '" value="' + val + '"' + (String(atual) === String(val) ? ' checked' : '') + '>' + esc(rot);
+  const obrig = function (p) { return p.obrigatoria !== false; };
+  const getVal = function (p, ctx) { return ctx ? ((rasc.professores[ctx.prof] || {})[p.id]) : rasc[p.id]; };
+  const nm = function (p, ctx) { return ctx ? 'pf::' + ctx.idx + '::' + p.id : p.id; };
+
+  function radio(name, val, rot, atual, cls) {
+    return '<label class="' + (cls || '') + '"><input type="radio" name="' + esc(name) + '" value="' + esc(val) + '"' +
+      (String(atual) === String(val) ? ' checked' : '') + '>' + rot + '</label>';
   }
 
-  function renderTermo() {
+  function pergunta(p, ctx) {
+    const v = getVal(p, ctx), n = nm(p, ctx);
+    let corpo = '';
+    if (p.tipo === 'escala') {
+      corpo = '<div class="opts esc">' + ESC.map(function (r, i) { return radio(n, i + 1, '<b>' + (i + 1) + '</b><small>' + esc(r) + '</small>', v); }).join('') +
+        (ctx ? radio(n, 'NSA', '<small>Não tive aula com este(a) professor(a)</small>', v, 'na') : '') + '</div>';
+    } else if (p.tipo === 'nps') {
+      let o = ''; for (let i = 0; i <= 10; i++) o += radio(n, i, i, v);
+      corpo = '<div class="opts nps">' + o + '</div><div class="scale-notes"><span>Nunca recomendaria</span><span>Com certeza recomendaria</span></div>';
+    } else if (p.tipo === 'unica') {
+      corpo = '<div class="lista">' + p.opcoes.map(function (o) { return radio(n, o, esc(o), v, 'op'); }).join('') + '</div>';
+    } else if (p.tipo === 'multipla') {
+      const sel = Array.isArray(v) ? v : [];
+      corpo = '<div class="lista" data-max="' + (p.max || 1) + '">' + p.opcoes.map(function (o) {
+        return '<label class="op"><input type="checkbox" name="' + esc(n) + '" value="' + esc(o.v) + '"' + (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '>' + esc(o.t) + '</label>';
+      }).join('') + '</div>';
+    } else {
+      corpo = '<textarea class="input" name="' + esc(n) + '" maxlength="' + (p.maxlen || 2000) + '">' + esc(v || '') + '</textarea>' +
+        (p.maxlen ? '<div class="contador"><span>' + String(v || '').length + '</span>/' + p.maxlen + '</div>' : '');
+    }
+    return '<div class="q" data-id="' + esc(p.id) + '"' + (ctx ? ' data-prof="' + esc(ctx.prof) + '"' : '') + ' data-req="' + obrig(p) + '"><p>' + esc(p.texto) +
+      (obrig(p) ? ' <span class="req">*</span>' : '') + '</p>' + (p.ajuda && !ctx ? '<div class="ajuda">' + esc(p.ajuda) + '</div>' : '') + corpo + '</div>';
+  }
+
+  function achar(nome) {   // devolve {p, ctx}
+    const m = /^pf::(\d+)::(.+)$/.exec(nome);
+    if (m) {
+      const sec = Q.secoes[passo - 1];
+      return { p: sec.perguntas.find(function (x) { return x.id === m[2]; }), ctx: { prof: sec.lista[Number(m[1])] } };
+    }
+    return { p: Q.secoes[passo - 1].perguntas.find(function (x) { return x.id === nome; }), ctx: null };
+  }
+
+  function guardar(p, ctx, valor) {
+    if (ctx) { (rasc.professores[ctx.prof] = rasc.professores[ctx.prof] || {})[p.id] = valor; } else { rasc[p.id] = valor; }
+    salvar();
+  }
+
+  function aoMudar(e) {
+    const el = e.target; if (!el.name) return;
+    const a = achar(el.name); if (!a.p) return;
+    const q = el.closest('.q');
+    if (el.type === 'radio') {
+      guardar(a.p, a.ctx, el.value);
+      q.classList.remove('invalid');
+    } else if (el.type === 'checkbox') {
+      const max = Number(q.querySelector('.lista').dataset.max);
+      let marcados = Array.prototype.slice.call(q.querySelectorAll('input:checked'));
+      if (marcados.length > max) { el.checked = false; marcados = marcados.filter(function (x) { return x !== el; }); erro('Você pode marcar no máximo ' + max + ' opções.'); }
+      guardar(a.p, a.ctx, marcados.map(function (x) { return x.value; }));
+      if (marcados.length) q.classList.remove('invalid');
+    }
+  }
+
+  function aoDigitar(e) {
+    const el = e.target; if (el.tagName !== 'TEXTAREA') return;
+    const a = achar(el.name); if (!a.p) return;
+    guardar(a.p, a.ctx, el.value);
+    const c = el.closest('.q').querySelector('.contador span'); if (c) c.textContent = el.value.length;
+  }
+
+  function renderInicio() {
     card.innerHTML = progresso() + '<h2>' + esc(Q.titulo) + '</h2>' +
-      '<p class="sub">Antes de começar, leia com atenção.</p>' +
+      '<div class="abertura">' + (Q.abertura || []).map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' +
       '<div class="termo"><strong>Termo de ciência – tratamento de dados (LGPD)</strong><ul>' +
       '<li>A pesquisa integra o Programa de Avaliação Institucional (PAI) da Comissão Própria de Avaliação (CPA), conforme a Lei nº 10.861/2004 (SINAES).</li>' +
       '<li>Seu login é usado <u>somente</u> para confirmar seu vínculo e registrar que você participou (sem ligar ao conteúdo das respostas).</li>' +
       '<li>As respostas são armazenadas <u>sem identificação pessoal</u>. Os relatórios apresentam apenas dados agrupados, sem exibir grupos muito pequenos.</li>' +
-      '<li>A participação é voluntária e pode ser interrompida a qualquer momento. Evite se identificar ou identificar terceiros nos campos de texto.</li>' +
+      '<li>Há perguntas de perfil (idade, raça/cor, gênero, deficiência etc.). Elas são opcionais quando há a alternativa "Prefiro não informar" e só são divulgadas de forma agrupada.</li>' +
+      '<li>A participação é voluntária e pode ser interrompida a qualquer momento. Não se identifique nem identifique terceiros nos campos de texto.</li>' +
       '<li>Os dados serão usados exclusivamente para fins de autoavaliação institucional e protegidos conforme o Código de Conduta Institucional.</li></ul></div>' +
       '<label class="check"><input type="checkbox" id="aceite"' + (aceitou ? ' checked' : '') + '> Li e concordo em participar da pesquisa.</label>' +
       '<button class="btn" id="iniciar" type="button">Iniciar pesquisa</button><div class="msg" id="msg"></div>';
@@ -101,20 +155,39 @@
     });
   }
 
-  function erro(t) { const m = document.getElementById('msg'); m.className = 'msg err'; m.textContent = t; }
+  function erro(t) { const m = document.getElementById('msg'); if (!m) return; m.className = 'msg err'; m.textContent = t; }
 
-  async function proximo() {
-    let primeiro = null;
+  // ---------- validação e envio ----------
+  function faltando() {
+    const sec = Q.secoes[passo - 1];
+    const falta = [];
     card.querySelectorAll('.q').forEach(function (el) {
       if (el.dataset.req !== 'true') return;
-      if (rasc[el.dataset.id] === undefined || rasc[el.dataset.id] === '') { el.classList.add('invalid'); primeiro = primeiro || el; }
+      const id = el.dataset.id, prof = el.dataset.prof;
+      const v = prof ? (rasc.professores[prof] || {})[id] : rasc[id];
+      const vazio = v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
+      el.classList.toggle('invalid', vazio);
+      if (vazio) falta.push(el);
     });
-    if (primeiro) { erro('Responda as perguntas obrigatórias destacadas.'); primeiro.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    return falta;
+  }
+
+  async function proximo() {
+    const falta = faltando();
+    if (falta.length) {
+      erro('Responda as perguntas obrigatórias destacadas (' + falta.length + ').');
+      falta[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (passo < total) { passo++; salvar(); render(); return; }
 
     const btn = document.getElementById('prox'); btn.disabled = true; btn.textContent = 'Enviando...';
     const resp = {};
-    Q.secoes.forEach(function (sc) { sc.perguntas.forEach(function (q) { if (rasc[q.id] !== undefined) resp[q.id] = rasc[q.id]; }); });
+    Q.secoes.forEach(function (sc) {
+      if (sc.professores) return;
+      sc.perguntas.forEach(function (q) { if (rasc[q.id] !== undefined && rasc[q.id] !== '') resp[q.id] = rasc[q.id]; });
+    });
+    resp.professores = rasc.professores;
     const r = await api('enviar', { token: s.token, respostas: resp });
     if (r.ok) { sessao.limpar(); return concluido(); }
     btn.disabled = false; btn.textContent = 'Enviar respostas';
@@ -126,10 +199,12 @@
     window.scrollTo({ top: 0 });
     document.getElementById('quem').textContent = '';
     document.getElementById('sair').style.display = 'none';
-    card.innerHTML = '<div class="done"><div class="big">🎉</div><h2>Obrigado pela sua participação!</h2>' +
-      '<p>Suas respostas foram registradas de forma anônima. Você já pode fechar esta página.</p></div>';
+    card.innerHTML = '<div class="done"><div class="big">🎉</div><h2>A CPA agradece a sua participação!</h2>' +
+      '<p>Suas respostas foram registradas de forma anônima.</p><p class="mut">SENAI-MS conectando você ao mercado de trabalho e à tecnologia.</p></div>';
   }
 
+  card.addEventListener('change', aoMudar);
+  card.addEventListener('input', aoDigitar);
   render();
 })();
 </script>
